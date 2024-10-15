@@ -8,7 +8,7 @@ terraform {
 }
 
 provider "aws" {
-  region = "ap-south-1"
+  region = "us-east-1"
 }
 
 # Data block to get the default VPC
@@ -58,15 +58,15 @@ module "eks" {
   subnet_ids               = data.aws_subnet_ids.private.ids
 
   eks_managed_node_group_defaults = {
-    instance_types = ["t3.large"]
+    instance_types = ["t2.micro"]
   }
 
   eks_managed_node_groups = {
     example = {
       min_size     = 1
-      max_size     = 10
-      desired_size = 1
-      instance_types = ["t3.large"]
+      max_size     = 3
+      desired_size = 2
+      instance_types = ["t2.micro"]
     }
   }
 
