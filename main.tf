@@ -7,31 +7,27 @@ terraform {
   }
 }
 
-# Configure the AWS Provider
 provider "aws" {
   region = "ap-south-1"
 }
 
-module "vpc" {
-  source = "terraform-aws-modules/vpc/aws"
+# Data block to get the default VPC
+data "aws_vpc" "default" {
+  default = true
+}
 
-  name = "my-demo-vpc"
-  cidr = "10.10.0.0/16"
-
-  azs             = ["ap-south-1a", "ap-south-1b", "ap-south-1c"]
-  private_subnets = ["10.10.1.0/24", "10.10.2.0/24", "10.10.3.0/24"]
-  public_subnets  = ["10.10.101.0/24", "10.10.102.0/24", "10.10.103.0/24"]
-
-  enable_nat_gateway = true
-  enable_vpn_gateway = true
-
-  tags = {
-    Terraform = "true"
-    Environment = "dev"
+# Data block to get the default public subnets
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
   }
 }
 
-
+# Data block to get the default private subnets (if needed)
+data "aws_subnet_ids" "private" {
+  vpc_id = data.aws_vpc.default.id
+}
 
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
@@ -40,7 +36,7 @@ module "eks" {
   cluster_name    = "my-cluster"
   cluster_version = "1.29"
 
-  cluster_endpoint_public_access  = true
+  cluster_endpoint_public_access = true
 
   cluster_addons = {
     coredns = {
@@ -54,12 +50,13 @@ module "eks" {
     }
   }
 
-  vpc_id                   = module.vpc.vpc_id
-  
-  control_plane_subnet_ids = module.vpc.public_subnets
+  # Use the default VPC ID
+  vpc_id = data.aws_vpc.default.id
 
-  subnet_ids               = module.vpc.private_subnets
-  # EKS Managed Node Group(s)
+  # Use the default public and private subnets
+  control_plane_subnet_ids = data.aws_subnets.default.ids
+  subnet_ids               = data.aws_subnet_ids.private.ids
+
   eks_managed_node_group_defaults = {
     instance_types = ["t3.large"]
   }
@@ -69,16 +66,14 @@ module "eks" {
       min_size     = 1
       max_size     = 10
       desired_size = 1
-
       instance_types = ["t3.large"]
     }
   }
 
-  # Cluster access entry
-  # To add the current caller identity as an administrator
   enable_cluster_creator_admin_permissions = true
   tags = {
     Environment = "dev"
     Terraform   = "true"
   }
 }
+
